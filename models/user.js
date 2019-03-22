@@ -5,6 +5,10 @@ const Schema = mongoose.Schema;
 const passportLocalMongoose = require('passport-local-mongoose');
 
 const User = new Schema({
+  username: {
+    type: String,
+    unique: true
+  },
   firstname: {
     type: String,
     default: ''
@@ -15,6 +19,7 @@ const User = new Schema({
   },
   email: {
     type: String,
+    unique: true,
     required: true
   },
   admin: {
@@ -24,10 +29,6 @@ const User = new Schema({
   preferredSources: [{
     type: String
   }],
-  receiveNotifications: {
-    type: Boolean,
-    default: false
-  },
   country: {
     type: String,
     default: 'us'
@@ -38,6 +39,16 @@ const User = new Schema({
   }
 });
 
-User.plugin(passportLocalMongoose);
+User.plugin(passportLocalMongoose, {
+  // Log in with either username or email address
+  findByUsername: (model, queryParams) => {
+    for (let param of queryParams.$or) {
+      if (typeof param == 'object' && param.hasOwnProperty('username')) {
+        queryParams.$or.push({email: param.username});
+      }
+    }
+    return model.findOne(queryParams);
+  }
+});
 
 module.exports = mongoose.model('User', User);
