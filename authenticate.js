@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 
 const User = require('./models/user');
 const TOKEN_KEY = process.env.TOKEN_KEY;
+const RESET_TOKEN_KEY = process.env.RESET_TOKEN_KEY;
 
 exports.local = passport.use(new LocalStrategy(User.authenticate()));
 passport.serializeUser(User.serializeUser());
@@ -44,3 +45,25 @@ exports.verifyAdmin = (req, res, next) => {
     return next(err);
   }
 };
+
+exports.getPasswordResetToken = user => {
+  return jwt.sign(user, RESET_TOKEN_KEY, {expiresIn: 15 * 60 * 1000});
+};
+
+const passwordOpts = {};
+passwordOpts.jwtFromRequest = ExtractJwt.fromUrlQueryParameter('password-token');
+passwordOpts.secretOrKey = RESET_TOKEN_KEY;
+
+exports.jwtPassportPassword = passport.use('password-token', new JwtStrategy(passwordOpts, (jwt_payload, done) => {
+  User.findOne({_id: jwt_payload._id}, (err, user) => {
+    if (err) {
+      return done(err, false);
+    } else if (user) {
+      return done(null, user);
+    } else {
+      return done(null, false);
+    }
+  });
+}));
+
+exports.verifyPasswordReset = passport.authenticate('password-token', {session: false});
