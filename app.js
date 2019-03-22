@@ -7,7 +7,6 @@ var express = require('express');
 var path = require('path');
 var logger = require('morgan');
 const bodyParser = require('body-parser');
-const cors = require('cors');
 const mongoose = require('mongoose');
 mongoose.Promise = require('bluebird');
 const passport = require('passport');
@@ -15,7 +14,8 @@ const connect = mongoose.connect(
   process.env.MONGO_URL,
   {
     keepAlive: true,
-    keepAliveInitialDelay: 300000
+    keepAliveInitialDelay: 300000,
+    useNewUrlParser: true
   }
 );
 
