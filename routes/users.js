@@ -2,7 +2,25 @@
 
 const express = require('express');
 const bodyParser = require('body-parser');
+const path = require('path');
 const passport = require('passport');
+const nodemailer = require('nodemailer');
+const hbs = require('nodemailer-express-handlebars');
+const profileMap = require('../utils/profile-map');
+
+const transport = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+const handlebarsOptions = {
+  viewEngine: 'handlebars',
+  viewPath: path.resolve('../views/password-reset/'),
+  extName: '.html'
+};
+transport.use('compile', hbs(handlebarsOptions));
 
 const User = require('../models/user');
 const authenticate = require('../authenticate');
@@ -54,7 +72,7 @@ userRouter.route('/login')
 
 userRouter.route('/signup')
   .post((req, res, next) => {
-    User.register(new User({username: req.body.username}),
+    User.register(new User({username: req.body.username, email: req.body.email}),
       req.body.password,
       (err, user) => {
         if (err) {
@@ -62,18 +80,7 @@ userRouter.route('/signup')
           res.setHeader('content-type', 'application/json');
           res.json({error: err});
         } else {
-          if (req.body.firstname) {
-            user.firstname = req.body.firstname;
-          }
-          if (req.body.lastname) {
-            user.lastname = req.body.lastname;
-          }
-          if (req.body.language) {
-            user.language = req.body.language;
-          }
-          if (req.body.country) {
-            user.country = req.body.country;
-          }
+          profileMap(user, req.body);
           user.email = req.body.email;
           user.save((err, user) => {
             if (err) {
@@ -83,33 +90,34 @@ userRouter.route('/signup')
               return;
             }
             passport.authenticate('local')(req, res, () => {
-              res.statusCode = 200;
-              res.setHeader('content-type', 'application/json');
-              res.json({success: true, status: 'Registration successful'});
+              req.logIn(user, err => {
+                if (err) {
+                  return next(err);
+                }
+                const token = authenticate.getToken({_id: req.user._id});
+                res.statusCode = 200;
+                res.setHeader('content-type', 'application/json');
+                res.json({success: true, token: token, status: 'Registration successful'});
+              });
             });
           });
         }
       });
   });
 
-userRouter.route('/profile/:id')
+userRouter.route('/profile')
   .get(authenticate.verifyUser, (req, res, next) => {
     User.findById(req.user.id)
       .then(user => {
-        console.log(user);
-        if (user.id != req.params.id) {
-          res.statusCode = 401;
-          res.setHeader('content-type', 'application/json');
-          res.json({error: 'Username does not match login'});
-        } else {
+        if (user) {
           res.statusCode = 200;
           res.setHeader('content-type', 'applications/json');
           res.json({
+            username: user.username,
             firstname: user.firstname,
             lastname: user.lastname,
             email: user.email,
             preferredSources: user.preferredSources,
-            receiveNotifications: user.receiveNotifications,
             country: user.country,
             language: user.language
           });
@@ -120,33 +128,8 @@ userRouter.route('/profile/:id')
   .patch(authenticate.verifyUser, (req, res, next) => {
     User.findById(req.user.id)
       .then(user => {
-        console.log(user);
-        if (user.id != req.params.id) {
-          res.statusCode = 401;
-          res.setHeader('content-type', 'application/json');
-          res.json({error: 'Username does not match login'});
-        } else {
-          if (req.body.firstname) {
-            user.firstname = req.body.firstname;
-          }
-          if (req.body.lastname) {
-            user.lastname = req.body.lastname;
-          }
-          if (req.body.email) {
-            user.email = req.body.email;
-          }
-          if (req.body.preferredSources) {
-            user.preferredSources = req.body.preferredSources;
-          }
-          if (req.body.receiveNotifications) {
-            user.receiveNotifications = req.body.receiveNotifications;
-          }
-          if (req.body.country) {
-            user.country = req.body.country;
-          }
-          if (req.body.language) {
-            user.language = req.body.language;
-          }
+        if (user) {
+          profileMap(user, req.body);
           user.save()
             .then(user => {
               res.statusCode = 200;
@@ -156,7 +139,6 @@ userRouter.route('/profile/:id')
                 lastname: user.lastname,
                 email: user.email,
                 preferredSources: user.preferredSources,
-                receiveNotifications: user.receiveNotifications,
                 country: user.country,
                 language: user.language
               })
@@ -167,6 +149,71 @@ userRouter.route('/profile/:id')
               res.json({error: err});
               return;
             });
+        }
+      })
+      .catch(err => next(err));
+  });
+
+userRouter.route('/reset-password')
+  .post(authenticate.verifyUser, (req, res, next) => {
+    User.findById(req.user.id)
+      .then(user => {
+        if (user) {
+          const resetToken = authenticate.getPasswordResetToken({_id: req.user._id});
+          const resetEmail = {
+            to: user.email,
+            from: process.env.EMAIL_USER,
+            template: 'request-email',
+            subject: 'Password reset request',
+            context: {
+              name: user.firstname || user.username || 'User',
+              url: `${process.env.PASSWORD_RESET_URL}${resetToken}`
+            }
+          };
+          transport.sendMail(resetEmail, err => {
+            if (err) {
+              res.statusCode = 422;
+              res.setHeader('content-type', 'applictaion/json');
+              res.json({error: err});
+            } else {
+              res.statusCode = 200;
+              res.setHeader('content-type', 'application/json');
+              res.json({message: 'Please check your email for password reset instructions'});
+            }
+          })
+        } else {
+          res.statusCode = 404;
+          res.setHe('content-type', 'application/json');
+          res.json({error: 'User not found'});
+        }
+      })
+      .catch(err => next(err));
+  });
+
+userRouter.route('/new-password')
+  .post(authenticate.verifyUser, (req, res, next) => {
+    User.findById(req.user.id)
+      .then(user => {
+        if (user) {
+          user.changePassword(req.body.oldPassword, req.body.newPassword)
+            .then(updated => {
+              transport.sendMail({
+                to: user.email,
+                from: process.env.EMAIL_USER,
+                template: 'confirm-email',
+                subject: 'Password reset confirmation',
+                context: {
+                  name: user.firstname || user.username || 'User'
+                }
+              });
+              res.statusCode = 200;
+              res.setHeader('content-type', 'application/json');
+              res.json({success: true, status: 'Password successfully updated'});
+            });
+        } else {
+          res.statusCode = 404;
+          res.setHeader('content-type', 'application/json');
+          res.json({error: 'User not found'});
         }
       })
       .catch(err => next(err));
