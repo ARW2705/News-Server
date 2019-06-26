@@ -29,6 +29,7 @@ const userRouter = express.Router();
 
 userRouter.use(bodyParser.json());
 
+// Check if JWT is still valid
 userRouter.route('/checkJWTToken')
   .get((req, res) => {
     passport.authenticate('jwt', {session: false}, (err, user, data) => {
