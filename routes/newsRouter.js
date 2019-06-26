@@ -20,6 +20,7 @@ newsRouter.route('/')
       category: 'general',
       page: 1
     };
+    // apply any additional query params from request params
     if (req.query) {
       for (const key in req.query) {
         options[key] = req.query[key];
@@ -43,6 +44,7 @@ newsRouter.route('/search')
       page: 1,
       sortBy: 'relevancy'
     };
+    // apply any additional query params from request params
     if (req.query) {
       for (const key in req.query) {
         options[key] = req.query[key];
@@ -63,6 +65,7 @@ newsRouter.route('/search')
 newsRouter.route('/sources')
   .get((req, res, next) => {
     const options = {};
+    // apply any additional query params from request params
     if (req.query) {
       for (const key in req.query) {
         options[key] = req.query[key];
@@ -85,6 +88,8 @@ newsRouter.route('/preferred')
         const options = {
           page: 1
         };
+        // if preferred sources is specified, join into comma separated string
+        // otherwise, set country (sources and country cannot be used together)
         if (user.preferredSources.length) {
           options['sources'] = user.preferredSources.join(',');
         } else {
@@ -116,6 +121,7 @@ newsRouter.route('/preferred/search')
             && user.preferredSources.length) {
           options['sources'] = user.preferredSources;
         }
+        // apply any additional query params from request params
         if (req.query) {
           for (const key in req.query) {
             options[key] = req.query[key];
