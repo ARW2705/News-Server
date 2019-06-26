@@ -1,6 +1,7 @@
 'use strict';
 
 module.exports = (user, body) => {
+  // copy properties from body to user
   if (body.username) {
     user.username = body.username;
   }
