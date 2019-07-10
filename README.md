@@ -1,5 +1,7 @@
 # News Proxy Server
 
+**Work in progress**
+
 This Express.js server acts as a proxy server for NewsAPI to keep the api key separate from the [News App](https://github.com/ARW2705/News-App). The server also provides user functionality with MongoDB database
 
 ## Usage
@@ -17,6 +19,8 @@ Environment running server must contain variables for:
 ## TODO
 
 * Finish password reset via email
+* Add tests
+* Add documentation
 
 ## Author
 
