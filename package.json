@@ -14,7 +14,7 @@
     "flightplan": "^0.6.20",
     "http-errors": "~1.6.2",
     "mongodb": "^3.1.13",
-    "mongoose": "^5.4.16",
+    "mongoose": "^5.7.5",
     "morgan": "~1.9.0",
     "newsapi": "^2.4.0",
     "nodemailer": "^5.1.1",
